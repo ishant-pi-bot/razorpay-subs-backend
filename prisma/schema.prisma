@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions Subscription[]
+  entitlements  Entitlement[]
+  devices       Device[]
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  priceInPaise  Int
+  currency      String   @default("INR")
+  interval      String   // monthly, yearly
+  razorpayPlanId String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+  entitlements  Entitlement[]
+}
+
+model Subscription {
+  id                      String   @id @default(cuid())
+  userId                  String
+  planId                  String
+  provider                String   @default("razorpay")
+  providerSubscriptionId  String?  @unique
+  providerCustomerId      String?
+  status                  String
+  currentStartAt          DateTime?
+  currentEndAt            DateTime?
+  startedAt               DateTime?
+  endedAt                 DateTime?
+  cancelAtCycleEnd        Boolean  @default(false)
+  quantity                Int      @default(1)
+  rawLastPayload          Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+}
+
+model Entitlement {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  planId     String?
+  accessStatus String // active, grace, inactive, trial
+  validUntil DateTime?
+  graceUntil DateTime?
+  maxDevices Int      @default(3)
+  reason     String?
+  updatedAt  DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan? @relation(fields: [planId], references: [id])
+}
+
+model Device {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceFingerprint String
+  deviceName      String?
+  lastSeenAt      DateTime @default(now()) @updatedAt
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, deviceFingerprint])
+}
+
+model WebhookEvent {
+  id               String   @id @default(cuid())
+  provider         String
+  providerEventId  String?  @unique
+  eventType        String
+  signature        String?
+  payload          Json
+  processed        Boolean  @default(false)
+  processedAt      DateTime?
+  createdAt        DateTime @default(now())
+}
